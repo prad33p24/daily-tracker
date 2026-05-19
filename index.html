@@ -829,8 +829,14 @@ function styleHeader(ws, colCount) {
 //  AUTH
 // ═══════════════════════════════════════════════════════════════
 async function hashPassword(pw) {
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    // Fallback for non-secure contexts (should not happen on GitHub Pages)
+    let h = 0;
+    for (let i = 0; i < pw.length; i++) h = Math.imul(31, h) + pw.charCodeAt(i) | 0;
+    return 'f:' + (h >>> 0).toString(36);
+  }
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return 's:' + Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function loadUsers() {
@@ -859,12 +865,13 @@ function renderLoginScreen() {
         <div id="login-err" style="display:none;background:#fee2e2;color:#b91c1c;padding:.55rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;margin-bottom:1rem"></div>
         <div class="form-group" style="margin-bottom:.7rem">
           <label class="form-label">Username</label>
-          <input id="login-user" class="form-control" placeholder="Enter username"
+          <input id="login-user" class="form-control" placeholder="e.g. john or john_doe"
             autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+          <span style="font-size:.72rem;color:var(--muted);margin-top:.2rem">Letters, numbers, - and _ · min 2 chars</span>
         </div>
         <div class="form-group" style="margin-bottom:1.4rem">
           <label class="form-label">Password</label>
-          <input id="login-pass" class="form-control" type="password" placeholder="Enter password"
+          <input id="login-pass" class="form-control" type="password" placeholder="Min 4 characters"
             autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doLogin()">
@@ -880,46 +887,56 @@ function renderLoginScreen() {
 }
 
 async function doLogin() {
+  setLoginError('');
   const username = document.getElementById('login-user')?.value.trim().toLowerCase();
   const password = document.getElementById('login-pass')?.value;
   if (!username || !password) { setLoginError('Enter username and password.'); return; }
 
-  const users = loadUsers();
-  if (!users[username]) { setLoginError('User not found — create an account first.'); return; }
+  try {
+    const users = loadUsers();
+    if (!users[username]) { setLoginError('User not found — create an account first.'); return; }
 
-  const hash = await hashPassword(password);
-  if (users[username].hash !== hash) { setLoginError('Incorrect password.'); return; }
+    const hash = await hashPassword(password);
+    if (users[username].hash !== hash) { setLoginError('Incorrect password.'); return; }
 
-  currentUser = username;
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
-  store = loadStore();
-  view  = 'today';
-  render();
+    currentUser = username;
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
+    store = loadStore();
+    view  = 'today';
+    render();
+  } catch (e) {
+    setLoginError('Sign in failed: ' + e.message);
+  }
 }
 
 async function doRegister() {
+  setLoginError('');
   const username = document.getElementById('login-user')?.value.trim().toLowerCase();
   const password = document.getElementById('login-pass')?.value;
 
-  if (!username || !password)          { setLoginError('Enter username and password.'); return; }
-  if (username.length < 2)             { setLoginError('Username must be at least 2 characters.'); return; }
-  if (!/^[a-z0-9_]+$/.test(username)) { setLoginError('Username: letters, numbers and _ only.'); return; }
-  if (password.length < 4)             { setLoginError('Password must be at least 4 characters.'); return; }
+  if (!username || !password)            { setLoginError('Enter username and password.'); return; }
+  if (username.length < 2)              { setLoginError('Username must be at least 2 characters.'); return; }
+  if (!/^[a-z0-9_-]+$/.test(username)) { setLoginError('Username can only contain letters, numbers, - and _.'); return; }
+  if (password.length < 4)              { setLoginError('Password must be at least 4 characters.'); return; }
 
-  const users = loadUsers();
-  if (users[username]) { setLoginError('Username already taken — try another.'); return; }
+  try {
+    const users = loadUsers();
+    if (users[username]) { setLoginError('Username already taken — try another.'); return; }
 
-  const hash = await hashPassword(password);
-  users[username] = { hash, created: new Date().toISOString() };
-  saveUsers(users);
+    const hash = await hashPassword(password);
+    users[username] = { hash, created: new Date().toISOString() };
+    saveUsers(users);
 
-  currentUser = username;
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
-  store = { activities: [], nextId: 1 };
-  persist();
-  view  = 'today';
-  render();
-  toast(`Welcome, ${username}! Your tracker is ready.`);
+    currentUser = username;
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
+    store = { activities: [], nextId: 1 };
+    persist();
+    view  = 'today';
+    render();
+    toast(`Welcome, ${username}! Your tracker is ready.`);
+  } catch (e) {
+    setLoginError('Registration failed: ' + e.message);
+  }
 }
 
 function logout() {
