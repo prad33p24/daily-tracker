@@ -408,7 +408,7 @@ function render() {
   const app = document.getElementById('app');
   if (!currentUser) {
     app.innerHTML = renderLoginScreen();
-    setTimeout(() => document.getElementById('login-user')?.focus(), 60);
+    setTimeout(() => document.getElementById('si-user')?.focus(), 60);
     return;
   }
   if (view === 'today')           app.innerHTML = renderToday();
@@ -857,39 +857,82 @@ function renderLoginScreen() {
   return `
     <div style="display:flex;justify-content:center;align-items:center;min-height:72vh;padding:1rem">
       <div class="card" style="width:100%;max-width:380px;padding:2rem;box-shadow:0 4px 24px rgba(0,0,0,.12)">
-        <div style="text-align:center;margin-bottom:1.75rem">
+
+        <div style="text-align:center;margin-bottom:1.5rem">
           <div style="font-size:2.8rem;line-height:1">&#128203;</div>
           <h1 style="font-size:1.4rem;font-weight:800;margin-top:.6rem;color:var(--slate)">Activity Tracker</h1>
-          <p style="color:var(--muted);font-size:.82rem;margin-top:.3rem">Sign in or create a new account</p>
         </div>
+
+        <!-- Tab switcher -->
+        <div style="display:flex;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:1.5rem">
+          <button id="tab-signin" onclick="showLoginTab('signin')"
+            style="flex:1;padding:.55rem;border:none;cursor:pointer;font-weight:700;font-size:.85rem;background:var(--blue);color:#fff;transition:background .15s,color .15s">
+            Sign In
+          </button>
+          <button id="tab-register" onclick="showLoginTab('register')"
+            style="flex:1;padding:.55rem;border:none;cursor:pointer;font-weight:700;font-size:.85rem;background:#fff;color:var(--muted);transition:background .15s,color .15s">
+            Create Account
+          </button>
+        </div>
+
         <div id="login-err" style="display:none;background:#fee2e2;color:#b91c1c;padding:.55rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;margin-bottom:1rem"></div>
-        <div class="form-group" style="margin-bottom:.7rem">
-          <label class="form-label">Username</label>
-          <input id="login-user" class="form-control" placeholder="e.g. john or john_doe"
-            autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
-          <span style="font-size:.72rem;color:var(--muted);margin-top:.2rem">Letters, numbers, - and _ · min 2 chars</span>
+
+        <!-- Sign In form -->
+        <div id="form-signin">
+          <div class="form-group" style="margin-bottom:.7rem">
+            <label class="form-label">Username</label>
+            <input id="si-user" class="form-control" placeholder="Enter your username"
+              autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+          </div>
+          <div class="form-group" style="margin-bottom:1.25rem">
+            <label class="form-label">Password</label>
+            <input id="si-pass" class="form-control" type="password" placeholder="Enter your password"
+              autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doLogin()">
+            Sign In
+          </button>
         </div>
-        <div class="form-group" style="margin-bottom:1.4rem">
-          <label class="form-label">Password</label>
-          <input id="login-pass" class="form-control" type="password" placeholder="Min 4 characters"
-            autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+
+        <!-- Create Account form -->
+        <div id="form-register" style="display:none">
+          <div class="form-group" style="margin-bottom:.25rem">
+            <label class="form-label">Username</label>
+            <input id="reg-user" class="form-control" placeholder="e.g. john or john-doe"
+              autocomplete="username" onkeydown="if(event.key==='Enter')doRegister()">
+            <span style="font-size:.72rem;color:var(--muted);margin-top:.25rem;display:block">Letters, numbers, - and _ &nbsp;·&nbsp; min 2 chars</span>
+          </div>
+          <div class="form-group" style="margin-bottom:1.25rem;margin-top:.7rem">
+            <label class="form-label">Password</label>
+            <input id="reg-pass" class="form-control" type="password" placeholder="Min 4 characters"
+              autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()">
+          </div>
+          <button class="btn btn-success" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doRegister()">
+            Create Account
+          </button>
         </div>
-        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doLogin()">
-          Sign In
-        </button>
-        <div style="text-align:center;color:var(--muted);font-size:.78rem;margin:.85rem 0">— or —</div>
-        <button class="btn btn-ghost" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doRegister()">
-          Create Account
-        </button>
+
       </div>
     </div>
   `;
 }
 
+function showLoginTab(tab) {
+  setLoginError('');
+  const isSignIn = tab === 'signin';
+  document.getElementById('form-signin').style.display    = isSignIn ? '' : 'none';
+  document.getElementById('form-register').style.display  = isSignIn ? 'none' : '';
+  document.getElementById('tab-signin').style.background  = isSignIn ? 'var(--blue)' : '#fff';
+  document.getElementById('tab-signin').style.color       = isSignIn ? '#fff' : 'var(--muted)';
+  document.getElementById('tab-register').style.background= isSignIn ? '#fff' : 'var(--green)';
+  document.getElementById('tab-register').style.color     = isSignIn ? 'var(--muted)' : '#fff';
+  setTimeout(() => document.getElementById(isSignIn ? 'si-user' : 'reg-user')?.focus(), 40);
+}
+
 async function doLogin() {
   setLoginError('');
-  const username = document.getElementById('login-user')?.value.trim().toLowerCase();
-  const password = document.getElementById('login-pass')?.value;
+  const username = document.getElementById('si-user')?.value.trim().toLowerCase();
+  const password = document.getElementById('si-pass')?.value;
   if (!username || !password) { setLoginError('Enter username and password.'); return; }
 
   try {
@@ -911,8 +954,8 @@ async function doLogin() {
 
 async function doRegister() {
   setLoginError('');
-  const username = document.getElementById('login-user')?.value.trim().toLowerCase();
-  const password = document.getElementById('login-pass')?.value;
+  const username = document.getElementById('reg-user')?.value.trim().toLowerCase();
+  const password = document.getElementById('reg-pass')?.value;
 
   if (!username || !password)            { setLoginError('Enter username and password.'); return; }
   if (username.length < 2)              { setLoginError('Username must be at least 2 characters.'); return; }
