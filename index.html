@@ -364,8 +364,9 @@ function pendingActivities() {
   return store.activities
     .filter(a => !isDoneForCycle(a))
     .sort((a, b) => {
-      const od = (isOverdue(b) ? 1 : 0) - (isOverdue(a) ? 1 : 0);
-      if (od !== 0) return od;
+      const dlA = effectiveDeadline(a) || '9999-12-31';
+      const dlB = effectiveDeadline(b) || '9999-12-31';
+      if (dlA !== dlB) return dlA.localeCompare(dlB);
       return priorityRank(a.priority) - priorityRank(b.priority);
     });
 }
@@ -506,7 +507,7 @@ function renderToday() {
     <div class="card">
       <div class="card-title" style="margin-bottom:.75rem">
         Pending Activities
-        <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:.8rem;margin-left:.4rem">Overdue first · High → Medium → Low</span>
+        <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:.8rem;margin-left:.4rem">Earliest deadline first · then High → Medium → Low</span>
       </div>
       <div class="tbl-wrap">
         <table>
