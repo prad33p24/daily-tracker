@@ -602,8 +602,9 @@ function renderActivities() {
       }).join('');
 
   return `
-    <div style="margin-bottom:.9rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">
       <span style="font-size:1rem;font-weight:700;color:var(--slate)">Activities — Master List</span>
+      <button class="btn btn-primary" onclick="toggleForm()">&#43; Add Activity</button>
     </div>
     ${formHtml}
     <div class="card">
