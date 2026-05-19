@@ -249,11 +249,12 @@
 
 <nav>
   <span class="nav-brand">&#128203; Activity Tracker</span>
-  <div class="nav-tabs">
+  <div class="nav-tabs" id="nav-tabs" style="display:none">
     <button class="nav-tab active" data-view="today"      onclick="showView('today')">Today</button>
     <button class="nav-tab"        data-view="activities" onclick="showView('activities')">Activities</button>
     <button class="nav-tab"        data-view="completed"  onclick="showView('completed')">Completed</button>
   </div>
+  <div id="nav-right" style="display:flex;align-items:center;gap:.75rem;padding-left:.75rem"></div>
 </nav>
 
 <main id="app"></main>
@@ -263,17 +264,25 @@
 // ═══════════════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════════════
-const STORE_KEY = 'activityTracker_v2';
+const STORE_KEY   = 'activityTracker_v2';
+const USERS_KEY   = 'at_users';
+const SESSION_KEY = 'at_session';
+
+let currentUser = null;
+
+function userDataKey() {
+  return currentUser ? `${STORE_KEY}_${currentUser}` : STORE_KEY;
+}
 
 function loadStore() {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { activities: [], nextId: 1 }; }
+  try { return JSON.parse(localStorage.getItem(userDataKey())) || { activities: [], nextId: 1 }; }
   catch { return { activities: [], nextId: 1 }; }
 }
 
-let store = loadStore();
+let store = { activities: [], nextId: 1 }; // populated after session restore in INIT
 
 function persist() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  localStorage.setItem(userDataKey(), JSON.stringify(store));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -395,10 +404,16 @@ function showView(v) {
 //  RENDER DISPATCHER
 // ═══════════════════════════════════════════════════════════════
 function render() {
+  updateNav();
   const app = document.getElementById('app');
-  if (view === 'today')      app.innerHTML = renderToday();
+  if (!currentUser) {
+    app.innerHTML = renderLoginScreen();
+    setTimeout(() => document.getElementById('login-user')?.focus(), 60);
+    return;
+  }
+  if (view === 'today')           app.innerHTML = renderToday();
   else if (view === 'activities') app.innerHTML = renderActivities();
-  else                       app.innerHTML = renderCompleted();
+  else                            app.innerHTML = renderCompleted();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -811,6 +826,128 @@ function styleHeader(ws, colCount) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════════════════
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function loadUsers() {
+  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+
+function setLoginError(msg) {
+  const el = document.getElementById('login-err');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = msg ? '' : 'none';
+}
+
+function renderLoginScreen() {
+  return `
+    <div style="display:flex;justify-content:center;align-items:center;min-height:72vh;padding:1rem">
+      <div class="card" style="width:100%;max-width:380px;padding:2rem;box-shadow:0 4px 24px rgba(0,0,0,.12)">
+        <div style="text-align:center;margin-bottom:1.75rem">
+          <div style="font-size:2.8rem;line-height:1">&#128203;</div>
+          <h1 style="font-size:1.4rem;font-weight:800;margin-top:.6rem;color:var(--slate)">Activity Tracker</h1>
+          <p style="color:var(--muted);font-size:.82rem;margin-top:.3rem">Sign in or create a new account</p>
+        </div>
+        <div id="login-err" style="display:none;background:#fee2e2;color:#b91c1c;padding:.55rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;margin-bottom:1rem"></div>
+        <div class="form-group" style="margin-bottom:.7rem">
+          <label class="form-label">Username</label>
+          <input id="login-user" class="form-control" placeholder="Enter username"
+            autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="form-group" style="margin-bottom:1.4rem">
+          <label class="form-label">Password</label>
+          <input id="login-pass" class="form-control" type="password" placeholder="Enter password"
+            autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doLogin()">
+          Sign In
+        </button>
+        <div style="text-align:center;color:var(--muted);font-size:.78rem;margin:.85rem 0">— or —</div>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center;padding:.6rem;font-size:.9rem" onclick="doRegister()">
+          Create Account
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-user')?.value.trim().toLowerCase();
+  const password = document.getElementById('login-pass')?.value;
+  if (!username || !password) { setLoginError('Enter username and password.'); return; }
+
+  const users = loadUsers();
+  if (!users[username]) { setLoginError('User not found — create an account first.'); return; }
+
+  const hash = await hashPassword(password);
+  if (users[username].hash !== hash) { setLoginError('Incorrect password.'); return; }
+
+  currentUser = username;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
+  store = loadStore();
+  view  = 'today';
+  render();
+}
+
+async function doRegister() {
+  const username = document.getElementById('login-user')?.value.trim().toLowerCase();
+  const password = document.getElementById('login-pass')?.value;
+
+  if (!username || !password)          { setLoginError('Enter username and password.'); return; }
+  if (username.length < 2)             { setLoginError('Username must be at least 2 characters.'); return; }
+  if (!/^[a-z0-9_]+$/.test(username)) { setLoginError('Username: letters, numbers and _ only.'); return; }
+  if (password.length < 4)             { setLoginError('Password must be at least 4 characters.'); return; }
+
+  const users = loadUsers();
+  if (users[username]) { setLoginError('Username already taken — try another.'); return; }
+
+  const hash = await hashPassword(password);
+  users[username] = { hash, created: new Date().toISOString() };
+  saveUsers(users);
+
+  currentUser = username;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username }));
+  store = { activities: [], nextId: 1 };
+  persist();
+  view  = 'today';
+  render();
+  toast(`Welcome, ${username}! Your tracker is ready.`);
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem(SESSION_KEY);
+  store = { activities: [], nextId: 1 };
+  view  = 'today';
+  render();
+}
+
+function updateNav() {
+  const tabs  = document.getElementById('nav-tabs');
+  const right = document.getElementById('nav-right');
+  if (!tabs || !right) return;
+
+  if (currentUser) {
+    tabs.style.display = '';
+    right.innerHTML = `
+      <span style="color:rgba(255,255,255,.8);font-size:.8rem;font-weight:600">&#128100; ${escHtml(currentUser)}</span>
+      <button class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,.85);border-color:rgba(255,255,255,.3);padding:.3rem .75rem" onclick="logout()">Logout</button>
+    `;
+  } else {
+    tabs.style.display = 'none';
+    right.innerHTML = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════
 function escHtml(str) {
@@ -824,6 +961,20 @@ function escHtml(str) {
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
+(function restoreSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if (session?.username) {
+      const users = loadUsers();
+      if (users[session.username]) {
+        currentUser = session.username;
+        store = loadStore();
+      } else {
+        localStorage.removeItem(SESSION_KEY); // stale session
+      }
+    }
+  } catch { /* ignore */ }
+})();
 render();
 </script>
 </body>
