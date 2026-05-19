@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #2563eb;
+      --blue-dk: #1d4ed8;
+      --green:   #16a34a;
+      --orange:  #ea580c;
+      --red:     #dc2626;
+      --slate:   #1e293b;
+      --muted:   #64748b;
+      --border:  #e2e8f0;
+      --bg:      #f1f5f9;
+      --white:   #ffffff;
+      --radius:  10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--slate);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── Navigation ─────────────────────────────────────────── */
+    nav {
+      background: #1e3a8a;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .nav-brand {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -.01em;
+      padding: 0.9rem 0;
+      flex: 1;
+    }
+    .nav-tabs { display: flex; gap: 0.25rem; }
+    .nav-tab {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.65);
+      padding: 0.9rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .nav-tab:hover  { color: #fff; }
+    .nav-tab.active { color: #fff; border-bottom-color: #93c5fd; }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    main { max-width: 1060px; margin: 1.5rem auto; padding: 0 1rem; }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+    }
+
+    /* ── Summary strip ──────────────────────────────────────── */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .sum-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      border-left: 4px solid;
+    }
+    .sum-card.s-total  { border-color: var(--blue); }
+    .sum-card.s-done   { border-color: var(--green); }
+    .sum-card.s-pending{ border-color: var(--orange); }
+    .sum-card.s-overdue{ border-color: var(--red); }
+    .sum-num  { font-size: 2rem; font-weight: 800; line-height: 1; }
+    .s-total  .sum-num { color: var(--blue); }
+    .s-done   .sum-num { color: var(--green); }
+    .s-pending .sum-num{ color: var(--orange); }
+    .s-overdue .sum-num{ color: var(--red); }
+    .sum-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 0.2rem; }
+
+    /* ── Tables ─────────────────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #f8fafc; }
+    tr.row-overdue td { background: #fff5f5; }
+    tr.row-done   td { opacity: .55; }
+    .tbl-foot td { font-weight: 700; border-top: 2px solid var(--border); background: #f8fafc; }
+
+    /* ── Badges ─────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: .2rem .55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .bd-daily   { background: #dbeafe; color: #1e40af; }
+    .bd-weekly  { background: #ede9fe; color: #6d28d9; }
+    .bd-monthly { background: #fce7f3; color: #9d174d; }
+    .bd-other   { background: #d1fae5; color: #065f46; }
+    .bd-high    { background: #fee2e2; color: #b91c1c; }
+    .bd-medium  { background: #fef9c3; color: #92400e; }
+    .bd-low     { background: #f0fdf4; color: #166534; }
+    .bd-done    { background: #dcfce7; color: #166534; }
+    .bd-pending { background: #fef3c7; color: #b45309; }
+    .bd-overdue { background: #fee2e2; color: #b91c1c; }
+
+    /* ── Form ───────────────────────────────────────────────── */
+    .add-form {
+      background: #f8fafc;
+      border: 2px dashed #cbd5e1;
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      animation: slideDown .15s ease;
+    }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .form-title { font-size: 0.9rem; font-weight: 700; color: var(--slate); margin-bottom: 0.9rem; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    .form-full { grid-column: 1 / -1; }
+    .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .form-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+    .form-control {
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.7rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      transition: border-color .15s;
+      background: #fff;
+      width: 100%;
+    }
+    .form-control:focus { outline: none; border-color: var(--blue); }
+    textarea.form-control { min-height: 72px; resize: vertical; }
+    .form-actions { display: flex; gap: 0.5rem; margin-top: 0.9rem; }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: var(--blue-dk); }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+    .btn-ghost:hover { background: #f1f5f9; color: var(--slate); }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-sm { padding: 0.28rem 0.6rem; font-size: 0.78rem; }
+
+    /* ── Checkbox ───────────────────────────────────────────── */
+    .chk-wrap { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .chk-wrap input[type=checkbox] { width: 1rem; height: 1rem; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty { text-align: center; padding: 2.5rem 1rem; color: #94a3b8; }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+    /* ── Date chip ──────────────────────────────────────────── */
+    .date-chip { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+
+    /* ── Notification toast ─────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--slate); color: #fff;
+      padding: .65rem 1.1rem; border-radius: 8px;
+      font-size: 0.85rem; font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0,0,0,.2);
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .summary { grid-template-columns: repeat(2, 1fr); }
+      .nav-brand { font-size: 0.9rem; }
+      .nav-tab { padding: 0.9rem 0.6rem; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">&#128203; Activity Tracker</span>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-view="today"      onclick="showView('today')">Today</button>
+    <button class="nav-tab"        data-view="activities" onclick="showView('activities')">Activities</button>
+    <button class="nav-tab"        data-view="completed"  onclick="showView('completed')">Completed</button>
+  </div>
+</nav>
+
+<main id="app"></main>
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════════════
+const STORE_KEY = 'activityTracker_v2';
+
+function loadStore() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { activities: [], nextId: 1 }; }
+  catch { return { activities: [], nextId: 1 }; }
+}
+
+let store = loadStore();
+
+function persist() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DATE UTILS
+// ═══════════════════════════════════════════════════════════════
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Monday of current week (ISO)
+function weekStart() {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff).toISOString().slice(0, 10);
+}
+
+// Friday of current week (deadline used in Excel)
+function weekDeadline() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? -2 : 5 - day;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff).toISOString().slice(0, 10);
+}
+
+// Last Friday of current month (deadline used in Excel)
+function monthDeadline() {
+  const d = new Date();
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const dayOfWeek = last.getDay(); // 0=Sun
+  const fridayOffset = dayOfWeek >= 5 ? dayOfWeek - 5 : dayOfWeek + 2;
+  return new Date(d.getFullYear(), d.getMonth() + 1, -fridayOffset).toISOString().slice(0, 10);
+}
+
+// First day of current month
+function monthStart() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function effectiveDeadline(act) {
+  const t = todayISO();
+  if (act.category === 'Daily')   return t;
+  if (act.category === 'Weekly')  return weekDeadline();
+  if (act.category === 'Monthly') return monthDeadline();
+  return act.deadline || '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BUSINESS LOGIC
+// ═══════════════════════════════════════════════════════════════
+function isDoneForCycle(act) {
+  const t = todayISO();
+  if (act.category === 'Other')   return act.status === 'Done';
+  if (act.category === 'Daily')   return (act.completions || []).includes(t);
+  if (act.category === 'Weekly')  return (act.completions || []).some(d => d >= weekStart() && d <= t);
+  if (act.category === 'Monthly') return (act.completions || []).some(d => d >= monthStart() && d <= t);
+  return false;
+}
+
+function isOverdue(act) {
+  if (isDoneForCycle(act)) return false;
+  const t  = todayISO();
+  const dl = effectiveDeadline(act);
+  return dl !== '' && dl < t;
+}
+
+function priorityRank(p) {
+  return p === 'High' ? 0 : p === 'Medium' ? 1 : p === 'Low' ? 2 : 3;
+}
+
+function pendingActivities() {
+  return store.activities
+    .filter(a => !isDoneForCycle(a))
+    .sort((a, b) => {
+      const od = (isOverdue(b) ? 1 : 0) - (isOverdue(a) ? 1 : 0);
+      if (od !== 0) return od;
+      return priorityRank(a.priority) - priorityRank(b.priority);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let view      = 'today';
+let addOpen   = false;
+let editingId = null;
+
+// ═══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function showView(v) {
+  view = v;
+  addOpen   = false;
+  editingId = null;
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER DISPATCHER
+// ═══════════════════════════════════════════════════════════════
+function render() {
+  const app = document.getElementById('app');
+  if (view === 'today')      app.innerHTML = renderToday();
+  else if (view === 'activities') app.innerHTML = renderActivities();
+  else                       app.innerHTML = renderCompleted();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TODAY VIEW
+// ═══════════════════════════════════════════════════════════════
+function renderToday() {
+  const acts    = store.activities;
+  const total   = acts.length;
+  const done    = acts.filter(isDoneForCycle).length;
+  const pending = acts.filter(a => !isDoneForCycle(a)).length;
+  const overdue = acts.filter(isOverdue).length;
+
+  const cats    = ['Daily', 'Weekly', 'Monthly', 'Other'];
+  const dashRows = cats.map(cat => {
+    const ca  = acts.filter(a => a.category === cat);
+    const ct  = ca.length;
+    const cd  = ca.filter(isDoneForCycle).length;
+    const cp  = ca.filter(a => !isDoneForCycle(a)).length;
+    const cov = ca.filter(isOverdue).length;
+    return `<tr>
+      <td><span class="badge bd-${cat.toLowerCase()}">${cat}</span></td>
+      <td>${ct}</td>
+      <td style="color:var(--green);font-weight:700">${cd}</td>
+      <td style="color:var(--orange);font-weight:700">${cp}</td>
+      <td style="color:var(--red);font-weight:700">${cov || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const pActs    = pendingActivities();
+  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const pendingRows = pActs.length === 0
+    ? `<tr><td colspan="6"><div class="empty"><div class="empty-icon">&#10003;</div><div>All done for today!</div></div></td></tr>`
+    : pActs.map((a, i) => {
+        const ov = isOverdue(a);
+        const dl = effectiveDeadline(a);
+        const dlDisplay = a.category !== 'Other'
+          ? `<span class="badge bd-${a.category.toLowerCase()}" style="font-size:.7rem">${a.category}</span>`
+          : (dl ? `<span class="${ov ? 'badge bd-overdue' : ''}">${fmtDate(dl)}</span>` : '—');
+
+        return `<tr class="${ov ? 'row-overdue' : ''}">
+          <td style="color:var(--muted);width:32px">${i + 1}</td>
+          <td>
+            <label class="chk-wrap">
+              <input type="checkbox" onchange="markDone(${a.id})">
+              <span>${escHtml(a.name)}</span>
+            </label>
+          </td>
+          <td><span class="badge bd-${a.category.toLowerCase()}">${a.category}</span></td>
+          <td>${a.priority ? `<span class="badge bd-${a.priority.toLowerCase()}">${a.priority}</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+          <td>${dlDisplay}</td>
+          <td style="color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(a.notes || '')}</td>
+        </tr>`;
+      }).join('');
+
+  return `
+    <div class="card" style="margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="card-title" style="margin:0">Today's Agenda</span>
+        <span class="date-chip">${todayStr}</span>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="sum-card s-total" ><div class="sum-num">${total  }</div><div class="sum-label">Total</div></div>
+      <div class="sum-card s-done"  ><div class="sum-num">${done   }</div><div class="sum-label">Done</div></div>
+      <div class="sum-card s-pending"><div class="sum-num">${pending}</div><div class="sum-label">Pending</div></div>
+      <div class="sum-card s-overdue"><div class="sum-num">${overdue}</div><div class="sum-label">Overdue</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:.75rem">
+      <div class="card-title" style="margin-bottom:.75rem">Dashboard by Category</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Category</th><th>Total</th><th>Done</th><th>Pending</th><th>Overdue</th></tr></thead>
+          <tbody>
+            ${dashRows}
+            <tr class="tbl-foot">
+              <td>TOTAL</td>
+              <td>${total}</td>
+              <td style="color:var(--green)">${done}</td>
+              <td style="color:var(--orange)">${pending}</td>
+              <td style="color:var(--red)">${overdue || '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:.75rem">
+        Pending Activities
+        <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;font-size:.8rem;margin-left:.4rem">Overdue first · High → Medium → Low</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Category</th><th>Priority</th><th>Deadline</th><th>Notes</th></tr></thead>
+          <tbody>${pendingRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ACTIVITIES VIEW
+// ═══════════════════════════════════════════════════════════════
+function renderActivities() {
+  const editing = editingId !== null ? store.activities.find(a => a.id === editingId) : null;
+  const v = editing || {};
+  const showForm = addOpen || editing;
+
+  let formHtml = '';
+  if (showForm) {
+    const isCat = (c) => (v.category || 'Daily') === c ? 'selected' : '';
+    const isPri = (p) => (v.priority || '') === p ? 'selected' : '';
+    const isOther = (v.category || 'Daily') === 'Other';
+
+    formHtml = `
+      <div class="add-form">
+        <div class="form-title">${editing ? '&#9998; Edit Activity' : '&#43; New Activity'}</div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Activity *</label>
+            <input id="f-name" class="form-control" value="${escHtml(v.name || '')}" placeholder="What needs to be done?">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select id="f-cat" class="form-control" onchange="onCatChange()">
+              <option ${isCat('Daily')}>Daily</option>
+              <option ${isCat('Weekly')}>Weekly</option>
+              <option ${isCat('Monthly')}>Monthly</option>
+              <option ${isCat('Other')}>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Priority</label>
+            <select id="f-pri" class="form-control">
+              <option ${isPri('')}>— None —</option>
+              <option ${isPri('High')}>High</option>
+              <option ${isPri('Medium')}>Medium</option>
+              <option ${isPri('Low')}>Low</option>
+            </select>
+          </div>
+          <div class="form-group" id="dl-group" style="${isOther ? '' : 'display:none'}">
+            <label class="form-label">Deadline</label>
+            <input type="date" id="f-deadline" class="form-control" value="${v.deadline || ''}">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Notes</label>
+            <textarea id="f-notes" class="form-control">${escHtml(v.notes || '')}</textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveActivity(${editing ? editing.id : 'null'})">
+            ${editing ? '&#10003; Update' : '&#43; Add Activity'}
+          </button>
+          <button class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  const rows = store.activities.length === 0
+    ? `<tr><td colspan="8"><div class="empty"><div class="empty-icon">&#128196;</div><div>No activities yet. Add one above!</div></div></td></tr>`
+    : store.activities.map((a, i) => {
+        const done = isDoneForCycle(a);
+        const ov   = isOverdue(a);
+        const dl   = a.category === 'Other' ? (a.deadline ? fmtDate(a.deadline) : '—') : '<span style="color:#94a3b8;font-size:.8rem">Auto</span>';
+        return `<tr class="${ov ? 'row-overdue' : done ? 'row-done' : ''}">
+          <td style="color:var(--muted)">${i + 1}</td>
+          <td><strong>${escHtml(a.name)}</strong></td>
+          <td><span class="badge bd-${a.category.toLowerCase()}">${a.category}</span></td>
+          <td>${a.priority ? `<span class="badge bd-${a.priority.toLowerCase()}">${a.priority}</span>` : '<span style="color:#cbd5e1">—</span>'}</td>
+          <td>${dl}</td>
+          <td><span class="badge ${done ? 'bd-done' : ov ? 'bd-overdue' : 'bd-pending'}">${done ? 'Done' : ov ? 'Overdue' : 'Pending'}</span></td>
+          <td style="color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(a.notes || '')}</td>
+          <td>
+            <div style="display:flex;gap:.35rem">
+              <button class="btn btn-ghost btn-sm" onclick="editAct(${a.id})">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteAct(${a.id})">Del</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">
+      <span style="font-size:1rem;font-weight:700;color:var(--slate)">Activities — Master List</span>
+      <button class="btn btn-primary" onclick="toggleForm()">&#43; Add Activity</button>
+    </div>
+    ${formHtml}
+    <div class="card">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Category</th><th>Priority</th><th>Deadline</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COMPLETED VIEW
+// ═══════════════════════════════════════════════════════════════
+function renderCompleted() {
+  const items = store.activities
+    .filter(a => a.category === 'Other' && a.status === 'Done')
+    .sort((a, b) => (b.doneDate || '').localeCompare(a.doneDate || ''));
+
+  const rows = items.length === 0
+    ? `<tr><td colspan="6"><div class="empty"><div class="empty-icon">&#127881;</div><div>No completed activities yet.</div></div></td></tr>`
+    : items.map((a, i) => `<tr>
+        <td style="color:var(--muted)">${i + 1}</td>
+        <td>${escHtml(a.name)}</td>
+        <td><span class="badge bd-other">Other</span></td>
+        <td>${a.priority ? `<span class="badge bd-${a.priority.toLowerCase()}">${a.priority}</span>` : '—'}</td>
+        <td>${a.doneDate ? fmtDate(a.doneDate.slice(0, 10)) : '—'}</td>
+        <td style="color:var(--muted)">${escHtml(a.notes || '—')}</td>
+      </tr>`).join('');
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Completed Activities</span>
+        <span class="badge bd-done" style="font-size:.8rem">${items.length} completed</span>
+      </div>
+      <p style="color:var(--muted);font-size:.82rem;margin-bottom:1rem">
+        Recurring tasks (Daily / Weekly / Monthly) reset each cycle automatically — only one-off <strong>Other</strong> tasks are logged here.
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Category</th><th>Priority</th><th>Done Date</th><th>Notes</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function toggleForm() {
+  addOpen   = !addOpen;
+  editingId = null;
+  render();
+}
+
+function cancelForm() {
+  addOpen   = false;
+  editingId = null;
+  render();
+}
+
+function editAct(id) {
+  editingId = id;
+  addOpen   = false;
+  render();
+}
+
+function onCatChange() {
+  const cat = document.getElementById('f-cat')?.value;
+  const dlg = document.getElementById('dl-group');
+  if (dlg) dlg.style.display = cat === 'Other' ? '' : 'none';
+}
+
+function saveActivity(id) {
+  const name  = document.getElementById('f-name')?.value.trim();
+  const cat   = document.getElementById('f-cat')?.value;
+  const pri   = document.getElementById('f-pri')?.value;
+  const dl    = document.getElementById('f-deadline')?.value || '';
+  const notes = document.getElementById('f-notes')?.value.trim() || '';
+
+  if (!name) { toast('Activity name is required.'); return; }
+
+  if (id === null) {
+    store.activities.push({
+      id:          store.nextId++,
+      name, category: cat,
+      priority:    pri === '— None —' ? '' : pri,
+      deadline:    cat === 'Other' ? dl : '',
+      notes,
+      status:      'Active',
+      completions: [],
+      doneDate:    ''
+    });
+    toast('Activity added!');
+  } else {
+    const a = store.activities.find(x => x.id === id);
+    if (a) {
+      a.name     = name;
+      a.category = cat;
+      a.priority = pri === '— None —' ? '' : pri;
+      a.deadline = cat === 'Other' ? dl : '';
+      a.notes    = notes;
+    }
+    toast('Activity updated!');
+  }
+
+  persist();
+  addOpen   = false;
+  editingId = null;
+  render();
+}
+
+function deleteAct(id) {
+  if (!confirm('Delete this activity? This cannot be undone.')) return;
+  store.activities = store.activities.filter(a => a.id !== id);
+  persist();
+  render();
+  toast('Deleted.');
+}
+
+function markDone(id) {
+  const a = store.activities.find(x => x.id === id);
+  if (!a) return;
+  const t = todayISO();
+
+  if (a.category === 'Other') {
+    a.status   = 'Done';
+    a.doneDate = new Date().toISOString();
+    toast(`"${a.name}" completed!`);
+  } else {
+    if (!a.completions) a.completions = [];
+    if (!a.completions.includes(t)) a.completions.push(t);
+    toast(`"${a.name}" done for today!`);
+  }
+
+  persist();
+
+  // Small delay so the checkbox tick is visible before re-render
+  setTimeout(render, 300);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>
