@@ -243,6 +243,7 @@
       .nav-tab { padding: 0.9rem 0.6rem; font-size: 0.8rem; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -624,10 +625,16 @@ function renderCompleted() {
     <div class="card">
       <div class="card-header">
         <span class="card-title">Completed Activities</span>
-        <span class="badge bd-done" style="font-size:.8rem">${items.length} completed</span>
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <span class="badge bd-done" style="font-size:.8rem">${items.length} completed</span>
+          <button class="btn btn-success btn-sm" onclick="downloadExcel()" title="Download all data as Excel for backup / recovery">
+            &#8659; Download Excel
+          </button>
+        </div>
       </div>
       <p style="color:var(--muted);font-size:.82rem;margin-bottom:1rem">
         Recurring tasks (Daily / Weekly / Monthly) reset each cycle automatically — only one-off <strong>Other</strong> tasks are logged here.
+        The Excel backup contains <strong>all</strong> activities data across 3 sheets.
       </p>
       <div class="tbl-wrap">
         <table>
@@ -732,6 +739,75 @@ function markDone(id) {
 
   // Small delay so the checkbox tick is visible before re-render
   setTimeout(render, 300);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+function downloadExcel() {
+  if (typeof XLSX === 'undefined') { toast('Excel library not loaded — check your internet connection.'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: All Activities (full data for recovery) ──────────
+  const allRows = [['#', 'Activity', 'Category', 'Priority', 'Deadline', 'Status', 'Done Date', 'Notes', 'Completion History']];
+  store.activities.forEach((a, i) => {
+    const cycDone = isDoneForCycle(a);
+    const status  = a.category === 'Other'
+      ? (a.status === 'Done' ? 'Done' : 'Active')
+      : (cycDone ? 'Done (this cycle)' : 'Pending');
+    allRows.push([
+      i + 1,
+      a.name,
+      a.category,
+      a.priority || '',
+      a.deadline || '',
+      status,
+      a.doneDate ? a.doneDate.slice(0, 10) : '',
+      a.notes || '',
+      (a.completions || []).join(', ')
+    ]);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(allRows);
+  ws1['!cols'] = [4, 36, 10, 10, 12, 18, 12, 28, 40].map(w => ({ wch: w }));
+  styleHeader(ws1, allRows[0].length);
+  XLSX.utils.book_append_sheet(wb, ws1, 'All Activities');
+
+  // ── Sheet 2: Completed (Other tasks done) ─────────────────────
+  const compRows = [['#', 'Activity', 'Category', 'Priority', 'Done Date', 'Notes']];
+  store.activities
+    .filter(a => a.category === 'Other' && a.status === 'Done')
+    .sort((a, b) => (b.doneDate || '').localeCompare(a.doneDate || ''))
+    .forEach((a, i) => compRows.push([
+      i + 1, a.name, a.category, a.priority || '',
+      a.doneDate ? a.doneDate.slice(0, 10) : '', a.notes || ''
+    ]));
+  const ws2 = XLSX.utils.aoa_to_sheet(compRows);
+  ws2['!cols'] = [4, 36, 10, 10, 14, 28].map(w => ({ wch: w }));
+  styleHeader(ws2, compRows[0].length);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Completed');
+
+  // ── Sheet 3: Recurring History ────────────────────────────────
+  const histRows = [['Activity', 'Category', 'Completed On']];
+  store.activities
+    .filter(a => a.category !== 'Other' && (a.completions || []).length > 0)
+    .forEach(a => [...a.completions].sort().reverse()
+      .forEach(d => histRows.push([a.name, a.category, d])));
+  const ws3 = XLSX.utils.aoa_to_sheet(histRows);
+  ws3['!cols'] = [36, 10, 14].map(w => ({ wch: w }));
+  styleHeader(ws3, histRows[0].length);
+  XLSX.utils.book_append_sheet(wb, ws3, 'Recurring History');
+
+  XLSX.writeFile(wb, `ActivityTracker_${todayISO()}.xlsx`);
+  toast('Excel downloaded!');
+}
+
+function styleHeader(ws, colCount) {
+  for (let c = 0; c < colCount; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    if (!ws[addr]) continue;
+    ws[addr].s = { font: { bold: true }, fill: { fgColor: { rgb: 'E2E8F0' } } };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
